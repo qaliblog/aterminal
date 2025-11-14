@@ -2,7 +2,8 @@ package com.rk.terminal.gemini.client
 
 import com.rk.libcommons.alpineDir
 import com.rk.terminal.api.ApiProviderManager
-import com.rk.terminal.api.KeysExhaustedException
+import com.rk.terminal.api.ApiProviderManager.KeysExhaustedException
+import com.rk.terminal.gemini.tools.DeclarativeTool
 import com.rk.terminal.gemini.core.*
 import com.rk.terminal.gemini.tools.*
 import kotlinx.coroutines.Dispatchers

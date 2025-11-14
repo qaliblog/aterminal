@@ -32,10 +32,11 @@ object GeminiService {
             toolRegistry.registerTool(WebFetchTool())
             toolRegistry.registerTool(MemoryTool(workspaceRoot))
             
-            client = GeminiClient(toolRegistry, workspaceRoot)
+            val newClient = GeminiClient(toolRegistry, workspaceRoot)
+            client = newClient
             
             // Register web search tool (requires client reference)
-            toolRegistry.registerTool(WebSearchTool(client))
+            toolRegistry.registerTool(WebSearchTool(newClient))
             
             // Note: MCP tools would be registered here when MCP client is available
             // For now, MCP tools are created on-demand
