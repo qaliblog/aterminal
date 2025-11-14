@@ -58,6 +58,8 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
@@ -115,7 +117,11 @@ import com.rk.libcommons.localDir
 import com.rk.libcommons.pendingCommand
 import com.rk.resources.strings
 import com.rk.settings.Settings
+import com.rk.terminal.service.TabType
 import com.rk.terminal.ui.activities.terminal.MainActivity
+import com.rk.terminal.ui.screens.agent.AgentScreen
+import com.rk.terminal.ui.screens.codeeditor.CodeEditorScreen
+import com.rk.terminal.ui.screens.fileexplorer.FileExplorerScreen
 import com.rk.terminal.ui.components.SettingsToggle
 import com.rk.terminal.ui.routes.MainActivityRoutes
 import com.rk.terminal.ui.screens.settings.SettingsCard
@@ -191,6 +197,22 @@ fun TerminalScreen(
     val context = LocalContext.current
     val isDarkMode = isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
+    
+    // Track current active tab (per session)
+    val currentMainSessionId = mainActivityActivity.sessionBinder?.getService()?.currentSession?.value?.first ?: "main"
+    var selectedTabIndex by rememberSaveable(currentMainSessionId) { mutableStateOf(0) }
+    
+    val tabs = listOf(
+        TabType.TERMINAL,
+        TabType.FILE_EXPLORER,
+        TabType.TEXT_EDITOR,
+        TabType.AGENT
+    )
+    
+    // Reset tab to Terminal when switching sessions
+    LaunchedEffect(currentMainSessionId) {
+        selectedTabIndex = 0
+    }
 
 
     LaunchedEffect(Unit){
@@ -238,10 +260,30 @@ fun TerminalScreen(
 
 
     }
+    
+    // Handle tab changes - switch session when tab changes
+    LaunchedEffect(selectedTabIndex, currentMainSessionId) {
+        terminalView.get()?.let { view ->
+            val mainSessionId = mainActivityActivity.sessionBinder?.getService()?.currentSession?.value?.first ?: "main"
+            val currentTabType = tabs[selectedTabIndex]
+            val sessionIdForTab = mainActivityActivity.sessionBinder?.getService()
+                ?.getSessionIdForTab(mainSessionId, currentTabType)
+            
+            sessionIdForTab?.let { sessionId ->
+                val session = mainActivityActivity.sessionBinder?.getSession(sessionId)
+                if (session != null && view.mTermSession != session) {
+                    val client = TerminalBackEnd(view, mainActivityActivity)
+                    session.updateTerminalSessionClient(client)
+                    view.attachSession(session)
+                    view.setTerminalViewClient(client)
+                    view.onScreenUpdated()
+                }
+            }
+        }
+    }
 
     Box {
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-        val scope = rememberCoroutineScope()
         val configuration = LocalConfiguration.current
         val screenWidthDp = configuration.screenWidthDp
         val drawerWidth = (screenWidthDp * 0.84).dp
@@ -279,12 +321,13 @@ fun TerminalScreen(
                         return newString
                     }
 
-                    val sessionId = generateUniqueString(mainActivityActivity.sessionBinder!!.getService().sessionList.keys.toList())
+                    val sessionId = generateUniqueString(mainActivityActivity.sessionBinder!!.getService().getVisibleSessions())
 
                     terminalView.get()
                         ?.let {
                             val client = TerminalBackEnd(it, mainActivityActivity)
-                            mainActivityActivity.sessionBinder!!.createSession(
+                            // Create session with 3 hidden sessions (file explorer, text editor, agent)
+                            mainActivityActivity.sessionBinder!!.createSessionWithHidden(
                                 sessionId,
                                 client,
                                 mainActivityActivity, workingMode = workingMode
@@ -363,7 +406,7 @@ fun TerminalScreen(
 
                         }
 
-                        mainActivityActivity.sessionBinder?.getService()?.sessionList?.keys?.toList()?.let {
+                        mainActivityActivity.sessionBinder?.getService()?.getVisibleSessions()?.let {
                             LazyColumn {
                                 items(it) { session_id ->
                                     SelectableCard(
@@ -469,7 +512,36 @@ fun TerminalScreen(
                                     TopAppBarDefaults.windowInsets.getTop(density).toDp()
                                 }
                             })) {
-                                AndroidView(
+                                // Tab Row
+                                val currentMainSession = mainActivityActivity.sessionBinder?.getService()?.currentSession?.value?.first ?: "main"
+                                TabRow(
+                                    selectedTabIndex = selectedTabIndex,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    tabs.forEachIndexed { index, tabType ->
+                                        Tab(
+                                            selected = selectedTabIndex == index,
+                                            onClick = { 
+                                                selectedTabIndex = index
+                                            },
+                                            text = {
+                                                Text(
+                                                    when (tabType) {
+                                                        TabType.TERMINAL -> "Terminal"
+                                                        TabType.FILE_EXPLORER -> "File Explorer"
+                                                        TabType.TEXT_EDITOR -> "Text Editor"
+                                                        TabType.AGENT -> "Agent"
+                                                    }
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                                
+                                // Show appropriate screen based on selected tab
+                                when (tabs[selectedTabIndex]) {
+                                    TabType.TERMINAL -> {
+                                        AndroidView(
                                     factory = { context ->
                                         TerminalView(context, null).apply {
                                             terminalView = WeakReference(this)
@@ -480,27 +552,43 @@ fun TerminalScreen(
                                                 )
                                             )
                                             val client = TerminalBackEnd(this, mainActivityActivity)
+                                            
+                                            // Get the current main session ID
+                                            val mainSessionId = if (pendingCommand != null) {
+                                                pendingCommand!!.id
+                                            } else {
+                                                mainActivityActivity.sessionBinder!!.getService().currentSession.value.first
+                                            }
+                                            
+                                            // Get the session ID for the currently selected tab
+                                            val currentTabType = tabs[selectedTabIndex]
+                                            val sessionIdForTab = mainActivityActivity.sessionBinder!!.getService()
+                                                .getSessionIdForTab(mainSessionId, currentTabType)
 
                                             val session = if (pendingCommand != null) {
                                                 mainActivityActivity.sessionBinder!!.getService().currentSession.value = Pair(
                                                     pendingCommand!!.id, pendingCommand!!.workingMode)
-                                                mainActivityActivity.sessionBinder!!.getSession(
-                                                    pendingCommand!!.id
-                                                )
-                                                    ?: mainActivityActivity.sessionBinder!!.createSession(
-                                                        pendingCommand!!.id,
+                                                // Create session with hidden if needed
+                                                mainActivityActivity.sessionBinder!!.getSession(mainSessionId)
+                                                    ?: mainActivityActivity.sessionBinder!!.createSessionWithHidden(
+                                                        mainSessionId,
                                                         client,
                                                         mainActivityActivity, workingMode = Settings.working_Mode
                                                     )
+                                                // Get the session for the current tab
+                                                mainActivityActivity.sessionBinder!!.getSession(sessionIdForTab)
+                                                    ?: mainActivityActivity.sessionBinder!!.getSession(mainSessionId)
                                             } else {
-                                                mainActivityActivity.sessionBinder!!.getSession(
-                                                    mainActivityActivity.sessionBinder!!.getService().currentSession.value.first
-                                                )
-                                                    ?: mainActivityActivity.sessionBinder!!.createSession(
-                                                        mainActivityActivity.sessionBinder!!.getService().currentSession.value.first,
+                                                // Ensure main session exists
+                                                val mainSession = mainActivityActivity.sessionBinder!!.getSession(mainSessionId)
+                                                    ?: mainActivityActivity.sessionBinder!!.createSessionWithHidden(
+                                                        mainSessionId,
                                                         client,
                                                         mainActivityActivity,workingMode = Settings.working_Mode
                                                     )
+                                                // Get the session for the current tab
+                                                mainActivityActivity.sessionBinder!!.getSession(sessionIdForTab)
+                                                    ?: mainSession
                                             }
 
                                             session.updateTerminalSessionClient(client)
@@ -544,8 +632,31 @@ fun TerminalScreen(
                                         }
                                     },
                                 )
+                                    }
+                                    
+                                    TabType.FILE_EXPLORER -> {
+                                        FileExplorerScreen(
+                                            mainActivity = mainActivityActivity,
+                                            sessionId = currentMainSession
+                                        )
+                                    }
+                                    
+                                    TabType.TEXT_EDITOR -> {
+                                        CodeEditorScreen(
+                                            mainActivity = mainActivityActivity,
+                                            sessionId = currentMainSession
+                                        )
+                                    }
+                                    
+                                    TabType.AGENT -> {
+                                        AgentScreen(
+                                            mainActivity = mainActivityActivity,
+                                            sessionId = currentMainSession
+                                        )
+                                    }
+                                }
 
-                                if (showVirtualKeys.value){
+                                if (showVirtualKeys.value && tabs[selectedTabIndex] == TabType.TERMINAL){
                                     val pagerState = rememberPagerState(pageCount = { 2 })
                                     val onSurfaceColor = MaterialTheme.colorScheme.onSurface.toArgb()
                                     HorizontalPager(
@@ -732,7 +843,7 @@ fun changeSession(mainActivityActivity: MainActivity, session_id: String) {
         val client = TerminalBackEnd(this, mainActivityActivity)
         val session =
             mainActivityActivity.sessionBinder!!.getSession(session_id)
-                ?: mainActivityActivity.sessionBinder!!.createSession(
+                ?: mainActivityActivity.sessionBinder!!.createSessionWithHidden(
                     session_id,
                     client,
                     mainActivityActivity,workingMode = Settings.working_Mode

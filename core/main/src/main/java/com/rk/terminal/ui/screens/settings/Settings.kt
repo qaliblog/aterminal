@@ -128,5 +128,8 @@ fun Settings(modifier: Modifier = Modifier,navController: NavController,mainActi
                 Icon(imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null,modifier = Modifier.padding(16.dp))
             })
         }
+        
+        // API Provider Settings
+        ApiProviderSettings()
     }
 }

@@ -20,10 +20,21 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import okhttp3.internal.wait
 
+enum class TabType {
+    TERMINAL,
+    FILE_EXPLORER,
+    TEXT_EDITOR,
+    AGENT
+}
+
 class SessionService : Service() {
     private val sessions = hashMapOf<String, TerminalSession>()
     val sessionList = mutableStateMapOf<String,Int>()
     var currentSession = mutableStateOf(Pair("main",com.rk.settings.Settings.working_Mode))
+    // Track hidden sessions (file explorer, text editor, agent)
+    private val hiddenSessions = mutableSetOf<String>()
+    // Track which hidden sessions belong to which main session
+    private val sessionGroups = mutableMapOf<String, List<String>>()
 
     inner class SessionBinder : Binder() {
         fun getService():SessionService{
@@ -35,6 +46,8 @@ class SessionService : Service() {
             }
             sessions.clear()
             sessionList.clear()
+            hiddenSessions.clear()
+            sessionGroups.clear()
             updateNotification()
         }
         fun createSession(id: String, client: TerminalSessionClient, activity: MainActivity,workingMode:Int): TerminalSession {
@@ -44,12 +57,83 @@ class SessionService : Service() {
                 updateNotification()
             }
         }
+        
+        fun createSessionWithHidden(id: String, client: TerminalSessionClient, activity: MainActivity, workingMode: Int): TerminalSession {
+            // Create the main visible session
+            val mainSession = createSession(id, client, activity, workingMode)
+            
+            // Create 3 hidden sessions for file explorer, text editor, and agent
+            val hiddenSessionIds = listOf(
+                "${id}_file_explorer",
+                "${id}_text_editor",
+                "${id}_agent"
+            )
+            
+            // Create hidden sessions with a dummy client (they won't be displayed)
+            hiddenSessionIds.forEach { hiddenId ->
+                val hiddenClient = object : TerminalSessionClient {
+                    override fun onTextChanged(changedSession: TerminalSession) {}
+                    override fun onTitleChanged(changedSession: TerminalSession) {}
+                    override fun onSessionFinished(finishedSession: TerminalSession) {}
+                    override fun onCopyTextToClipboard(session: TerminalSession, text: String) {}
+                    override fun onPasteTextFromClipboard(session: TerminalSession?) {}
+                    override fun setTerminalShellPid(session: TerminalSession, pid: Int) {}
+                    override fun onBell(session: TerminalSession) {}
+                    override fun onColorsChanged(session: TerminalSession) {}
+                    override fun onTerminalCursorStateChange(state: Boolean) {}
+                    override fun getTerminalCursorStyle(): Int = com.termux.terminal.TerminalEmulator.DEFAULT_TERMINAL_CURSOR_STYLE
+                    override fun logError(tag: String?, message: String?) {}
+                    override fun logWarn(tag: String?, message: String?) {}
+                    override fun logInfo(tag: String?, message: String?) {}
+                    override fun logDebug(tag: String?, message: String?) {}
+                    override fun logVerbose(tag: String?, message: String?) {}
+                    override fun logStackTraceWithMessage(tag: String?, message: String?, e: Exception?) {}
+                    override fun logStackTrace(tag: String?, e: Exception?) {}
+                }
+                
+                val hiddenSession = MkSession.createSession(activity, hiddenClient, hiddenId, workingMode = workingMode)
+                sessions[hiddenId] = hiddenSession
+                // Don't add hidden sessions to sessionList - they should not appear in UI
+                hiddenSessions.add(hiddenId)
+            }
+            
+            // Track the relationship between main session and hidden sessions
+            sessionGroups[id] = hiddenSessionIds
+            
+            return mainSession
+        }
+        
+        fun isHiddenSession(id: String): Boolean {
+            return hiddenSessions.contains(id)
+        }
+        
+        fun getVisibleSessions(): List<String> {
+            return sessionList.keys.filter { !isHiddenSession(it) }
+        }
+        
+        fun getSessionIdForTab(mainSessionId: String, tabType: TabType): String {
+            return when (tabType) {
+                TabType.TERMINAL -> mainSessionId
+                TabType.FILE_EXPLORER -> "${mainSessionId}_file_explorer"
+                TabType.TEXT_EDITOR -> "${mainSessionId}_text_editor"
+                TabType.AGENT -> "${mainSessionId}_agent"
+            }
+        }
+        
+        fun getMainSessionIdFromTabId(tabSessionId: String): String? {
+            return when {
+                tabSessionId.endsWith("_file_explorer") -> tabSessionId.removeSuffix("_file_explorer")
+                tabSessionId.endsWith("_text_editor") -> tabSessionId.removeSuffix("_text_editor")
+                tabSessionId.endsWith("_agent") -> tabSessionId.removeSuffix("_agent")
+                else -> if (!isHiddenSession(tabSessionId)) tabSessionId else null
+            }
+        }
         fun getSession(id: String): TerminalSession? {
             return sessions[id]
         }
         fun terminateSession(id: String) {
             runCatching {
-                //crash is here
+                // Terminate the main session
                 sessions[id]?.apply {
                     if (emulator != null){
                         sessions[id]?.finishIfRunning()
@@ -58,6 +142,19 @@ class SessionService : Service() {
 
                 sessions.remove(id)
                 sessionList.remove(id)
+                
+                // Also terminate associated hidden sessions
+                sessionGroups[id]?.forEach { hiddenId ->
+                    sessions[hiddenId]?.apply {
+                        if (emulator != null) {
+                            finishIfRunning()
+                        }
+                    }
+                    sessions.remove(hiddenId)
+                    hiddenSessions.remove(hiddenId)
+                }
+                sessionGroups.remove(id)
+                
                 if (sessions.isEmpty()) {
                     stopSelf()
                 } else {
