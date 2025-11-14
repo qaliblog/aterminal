@@ -1,0 +1,131 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.2.1
+  workflow_dispatch:  # Allows manual triggering
+    inputs:
+      build_flavor:
+        description: 'Build flavor (Fdroid or PlayStore)'
+        required: true
+        default: 'Fdroid'
+        type: choice
+        options:
+          - Fdroid
+          - PlayStore
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git commit hash
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      
+      - name: Setup signing
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_PROPERTIES: ${{ secrets.SIGNING_PROPERTIES }}
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/xed.keystore
+          fi
+          if [ -n "$SIGNING_PROPERTIES" ]; then
+            echo "$SIGNING_PROPERTIES" > /tmp/signing.properties
+          fi
+      
+      - name: Determine build flavor
+        id: flavor
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "flavor=${{ github.event.inputs.build_flavor }}" >> $GITHUB_OUTPUT
+          else
+            # Default to Fdroid for tag-based releases
+            echo "flavor=Fdroid" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build Release APK
+        run: |
+          ./gradlew clean
+          ./gradlew assemble${FLAVOR}Release
+        env:
+          FLAVOR: ${{ steps.flavor.outputs.flavor }}
+          GITHUB_ACTIONS: "true"
+      
+      - name: Build Release AAB (PlayStore only)
+        if: steps.flavor.outputs.flavor == 'PlayStore'
+        run: |
+          ./gradlew bundlePlayStoreRelease
+        env:
+          GITHUB_ACTIONS: "true"
+      
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "APK not found!"
+            exit 1
+          fi
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK_PATH)" >> $GITHUB_OUTPUT
+      
+      - name: Find AAB
+        id: find_aab
+        if: steps.flavor.outputs.flavor == 'PlayStore'
+        run: |
+          AAB_PATH=$(find app/build/outputs/bundle -name "*.aab" | head -n 1)
+          if [ -n "$AAB_PATH" ]; then
+            echo "aab_path=$AAB_PATH" >> $GITHUB_OUTPUT
+            echo "aab_name=$(basename $AAB_PATH)" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Get version info
+        id: version
+        run: |
+          VERSION_NAME=$(grep "versionName" app/build.gradle.kts | head -n 1 | sed -E "s/.*versionName = \"([^\"]+)\".*/\1/")
+          VERSION_CODE=$(grep "versionCode" app/build.gradle.kts | head -n 1 | sed -E "s/.*versionCode = ([0-9]+).*/\1/")
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION_NAME ($VERSION_CODE)"
+      
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ steps.flavor.outputs.flavor }}-release-${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}
+          path: ${{ steps.find_apk.outputs.apk_path }}
+          retention-days: 90
+      
+      - name: Upload AAB artifact
+        if: steps.flavor.outputs.flavor == 'PlayStore' && steps.find_aab.outputs.aab_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-PlayStore-release-bundle-${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}
+          path: ${{ steps.find_aab.outputs.aab_path }}
+          retention-days: 90
+      
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ steps.find_apk.outputs.apk_path }}
+            ${{ steps.find_aab.outputs.aab_path }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
