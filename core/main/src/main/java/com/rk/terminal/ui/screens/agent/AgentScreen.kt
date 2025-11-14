@@ -357,48 +357,19 @@ fun AgentScreen(
     
     // Workspace picker dialog
     if (showWorkspacePicker) {
-        var newWorkspace by remember { mutableStateOf(workspaceRoot) }
-        AlertDialog(
-            onDismissRequest = { showWorkspacePicker = false },
-            title = { Text("Select Workspace Directory") },
-            text = {
-                Column {
-                    Text("Enter workspace directory path:")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newWorkspace,
-                        onValueChange = { newWorkspace = it },
-                        label = { Text("Directory path") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val dir = java.io.File(newWorkspace)
-                        if (dir.exists() && dir.isDirectory) {
-                            workspaceRoot = newWorkspace
-                            showWorkspacePicker = false
-                            // Reinitialize client with new workspace
-                            val currentUseOllama = Settings.use_ollama
-                            val currentOllamaHost = Settings.ollama_host
-                            val currentOllamaPort = Settings.ollama_port
-                            val currentOllamaModel = Settings.ollama_model
-                            val currentOllamaUrl = "http://$currentOllamaHost:$currentOllamaPort"
-                            GeminiService.initialize(workspaceRoot, currentUseOllama, currentOllamaUrl, currentOllamaModel)
-                        }
-                    },
-                    enabled = newWorkspace.isNotBlank()
-                ) {
-                    Text("Set")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showWorkspacePicker = false }) {
-                    Text("Cancel")
-                }
+        DirectoryPickerDialog(
+            initialPath = workspaceRoot,
+            onDismiss = { showWorkspacePicker = false },
+            onDirectorySelected = { selectedDir ->
+                workspaceRoot = selectedDir.absolutePath
+                showWorkspacePicker = false
+                // Reinitialize client with new workspace
+                val currentUseOllama = Settings.use_ollama
+                val currentOllamaHost = Settings.ollama_host
+                val currentOllamaPort = Settings.ollama_port
+                val currentOllamaModel = Settings.ollama_model
+                val currentOllamaUrl = "http://$currentOllamaHost:$currentOllamaPort"
+                GeminiService.initialize(workspaceRoot, currentUseOllama, currentOllamaUrl, currentOllamaModel)
             }
         )
     }
