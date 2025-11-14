@@ -102,6 +102,7 @@ dependencies {
     api(libs.ui)
     api(libs.ui.graphics)
     api(libs.material3)
+    api(libs.material.icons.extended)
     api(libs.navigation.compose)
     api(project(":core:terminal-view"))
     api(project(":core:terminal-emulator"))

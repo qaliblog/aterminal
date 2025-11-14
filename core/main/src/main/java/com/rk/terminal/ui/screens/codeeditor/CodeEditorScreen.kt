@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -30,6 +31,7 @@ fun CodeEditorScreen(
     var isModified by remember { mutableStateOf(false) }
     var showFilePicker by remember { mutableStateOf(false) }
     var showSaveDialog by remember { mutableStateOf(false) }
+    var editTextRef by remember { mutableStateOf<android.widget.EditText?>(null) }
     
     Column(
         modifier = Modifier.fillMaxSize()
@@ -44,7 +46,7 @@ fun CodeEditorScreen(
             },
             navigationIcon = {
                 IconButton(onClick = { showFilePicker = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Open File")
+                    Icon(Icons.Default.FolderOpen, contentDescription = "Open File")
                 }
             },
             actions = {
@@ -63,7 +65,8 @@ fun CodeEditorScreen(
                     
                     IconButton(
                         onClick = {
-                            // Close file completely - reset everything
+                            // Close file completely - reset everything and clear EditText
+                            editTextRef?.setText("")
                             currentFile = null
                             fileContent = ""
                             isModified = false
@@ -223,7 +226,7 @@ fun FilePickerDialog(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
-                                    imageVector = if (file.isDirectory) Icons.Default.Add else Icons.Default.Edit,
+                                    imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
                                     contentDescription = null
                                 )
                                 Text(file.name)

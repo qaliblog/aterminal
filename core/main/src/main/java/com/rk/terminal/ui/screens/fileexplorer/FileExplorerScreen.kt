@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -83,14 +84,14 @@ fun FileExplorerScreen(
                             selectedFiles = emptySet()
                             isSelectionMode = false
                         }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Copy")
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copy")
                         }
                         IconButton(onClick = {
                             clipboardFiles = selectedFiles.map { it to "cut" }
                             selectedFiles = emptySet()
                             isSelectionMode = false
                         }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Cut")
+                            Icon(Icons.Default.ContentCut, contentDescription = "Cut")
                         }
                         IconButton(onClick = {
                             showDeleteDialog = FileItem(
@@ -146,17 +147,17 @@ fun FileExplorerScreen(
                             currentPath = ""
                             currentPath = reloadPath
                         }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Paste")
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
                         }
                     }
                     IconButton(onClick = { showNewFileDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "New File")
+                        Icon(Icons.Default.NoteAdd, contentDescription = "New File")
                     }
                     IconButton(onClick = { showNewDirDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "New Directory")
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = "New Directory")
                     }
                     IconButton(onClick = { isSelectionMode = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Select")
+                        Icon(Icons.Default.CheckCircle, contentDescription = "Select")
                     }
                 }
             }
@@ -526,21 +527,21 @@ fun loadFiles(path: String): List<FileItem> {
             val isFile = file.isFile
             
             val iconPair: Pair<androidx.compose.ui.graphics.vector.ImageVector, androidx.compose.ui.graphics.Color> = when {
-                isDirectory -> Pair(Icons.Default.Add, androidx.compose.ui.graphics.Color(0xFF2196F3))
+                isDirectory -> Pair(Icons.Default.Folder, androidx.compose.ui.graphics.Color(0xFF2196F3))
                 file.name.endsWith(".txt", ignoreCase = true) ||
                 file.name.endsWith(".md", ignoreCase = true) ||
                 file.name.endsWith(".log", ignoreCase = true) -> 
-                    Pair(Icons.Default.Edit, androidx.compose.ui.graphics.Color(0xFF757575))
+                    Pair(Icons.Default.Description, androidx.compose.ui.graphics.Color(0xFF757575))
                 file.name.endsWith(".jpg", ignoreCase = true) ||
                 file.name.endsWith(".png", ignoreCase = true) ||
                 file.name.endsWith(".gif", ignoreCase = true) ||
                 file.name.endsWith(".webp", ignoreCase = true) -> 
-                    Pair(Icons.Default.Person, androidx.compose.ui.graphics.Color(0xFF2196F3))
+                    Pair(Icons.Default.Image, androidx.compose.ui.graphics.Color(0xFF2196F3))
                 file.name.endsWith(".zip", ignoreCase = true) ||
                 file.name.endsWith(".tar", ignoreCase = true) ||
                 file.name.endsWith(".gz", ignoreCase = true) -> 
-                    Pair(Icons.Default.Add, androidx.compose.ui.graphics.Color(0xFF9C27B0))
-                else -> Pair(Icons.Default.Edit, androidx.compose.ui.graphics.Color(0xFF757575))
+                    Pair(Icons.Default.Archive, androidx.compose.ui.graphics.Color(0xFF9C27B0))
+                else -> Pair(Icons.Default.InsertDriveFile, androidx.compose.ui.graphics.Color(0xFF757575))
             }
             val icon = iconPair.first
             val iconColor = iconPair.second

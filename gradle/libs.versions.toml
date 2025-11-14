@@ -16,6 +16,7 @@ glide = "4.16.0"
 ktsh = "1.0.0"
 lsp4j = "0.23.1"
 material = "1.12.0"
+materialIconsExtended = "1.7.8"
 constraintlayout = "2.2.0"
 material3 = "1.4.0-alpha08"
 media3Exoplayer = "1.5.1"
@@ -79,6 +80,7 @@ glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
 ktsh = { module = "com.jaredrummler:ktsh", version.ref = "ktsh" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "materialIconsExtended" }
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Ui" }
 media3-exoplayer-dash = { module = "androidx.media3:media3-exoplayer-dash", version.ref = "media3ExoplayerDash" }
