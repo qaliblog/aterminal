@@ -440,7 +440,7 @@ fun WelcomeMessage() {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
-                imageVector = Icons.Default.AutoAwesome,
+                imageVector = Icons.Default.Star,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.primary
@@ -481,7 +481,7 @@ fun MessageBubble(message: AgentMessage) {
     ) {
         if (!message.isUser) {
             Icon(
-                imageVector = Icons.Default.AutoAwesome,
+                imageVector = Icons.Default.Star,
                 contentDescription = null,
                 modifier = Modifier
                     .size(32.dp)
