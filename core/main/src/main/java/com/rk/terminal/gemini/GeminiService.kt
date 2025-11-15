@@ -18,18 +18,23 @@ object GeminiService {
     private var currentWorkspaceRoot: String = alpineDir().absolutePath
     
     fun initialize(workspaceRoot: String = alpineDir().absolutePath, useOllama: Boolean = false, ollamaUrl: String = "http://localhost:11434", ollamaModel: String = "llama3.2"): Any {
+        val workspaceChanged = currentWorkspaceRoot != workspaceRoot
+        val useOllamaChanged = this.useOllama != useOllama
+        
         currentWorkspaceRoot = workspaceRoot
         this.useOllama = useOllama
         
         if (useOllama) {
-            if (ollamaClient == null) {
+            // Recreate client if workspace changed, useOllama changed, or client doesn't exist
+            if (ollamaClient == null || workspaceChanged || useOllamaChanged) {
                 val toolRegistry = ToolRegistry()
                 registerAllTools(toolRegistry, workspaceRoot)
                 ollamaClient = OllamaClient(toolRegistry, workspaceRoot, ollamaUrl, ollamaModel)
             }
             return ollamaClient!!
         } else {
-            if (client == null) {
+            // Recreate client if workspace changed, useOllama changed, or client doesn't exist
+            if (client == null || workspaceChanged || useOllamaChanged) {
                 val toolRegistry = ToolRegistry()
                 registerAllTools(toolRegistry, workspaceRoot)
                 
