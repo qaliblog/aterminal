@@ -66,7 +66,11 @@ class OllamaClient(
             
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    val errorBody = response.body?.string() ?: "Unknown error"
+                    val errorBody = try {
+                        response.body?.string() ?: "Unknown error"
+                    } catch (e: Exception) {
+                        "Failed to read error body: ${e.message}"
+                    }
                     emit(GeminiStreamEvent.Error("Ollama API error: ${response.code} - $errorBody"))
                     return@flow
                 }
@@ -96,14 +100,20 @@ class OllamaClient(
                         } catch (e: Exception) {
                             // Skip malformed JSON
                             android.util.Log.d("OllamaClient", "Failed to parse JSON: ${e.message}")
+                            emit(GeminiStreamEvent.Error("Failed to parse Ollama response: ${e.message ?: "Unknown error"}"))
+                            break
                         }
                     }
                 }
             }
         } catch (e: IOException) {
-            emit(GeminiStreamEvent.Error("Network error: ${e.message}"))
+            val errorMsg = e.message ?: "Network error"
+            android.util.Log.e("OllamaClient", "Network error", e)
+            emit(GeminiStreamEvent.Error("Network error: $errorMsg"))
         } catch (e: Exception) {
-            emit(GeminiStreamEvent.Error("Error: ${e.message}"))
+            val errorMsg = e.message ?: "Unknown error"
+            android.util.Log.e("OllamaClient", "Error", e)
+            emit(GeminiStreamEvent.Error("Error: $errorMsg"))
         }
     }
     

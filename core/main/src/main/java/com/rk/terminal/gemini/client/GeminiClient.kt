@@ -332,14 +332,19 @@ class GeminiClient(
         json.put("type", params.type)
         json.put("properties", JSONObject().apply {
             params.properties.forEach { (key, schema) ->
-                put(key, JSONObject().apply {
-                    put("type", schema.type)
-                    put("description", schema.description)
-                    schema.enum?.let { put("enum", JSONArray(it)) }
-                })
+                put(key, propertySchemaToJson(schema))
             }
         })
         json.put("required", JSONArray(params.required))
+        return json
+    }
+    
+    private fun propertySchemaToJson(schema: PropertySchema): JSONObject {
+        val json = JSONObject()
+        json.put("type", schema.type)
+        json.put("description", schema.description)
+        schema.enum?.let { json.put("enum", JSONArray(it)) }
+        schema.items?.let { json.put("items", propertySchemaToJson(it)) }
         return json
     }
     
