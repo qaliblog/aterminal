@@ -92,13 +92,19 @@ class GeminiClient(
                             key, 
                             model, 
                             requestBody, 
-                            onChunk, 
+                            { chunk ->
+                                // Call the callback AND emit to Flow
+                                onChunk(chunk)
+                                emit(GeminiStreamEvent.Chunk(chunk))
+                            }, 
                             { functionCall ->
                                 onToolCall(functionCall)
+                                emit(GeminiStreamEvent.ToolCall(functionCall))
                                 hasToolCalls = true
                             },
                             { toolName, args ->
                                 onToolResult(toolName, args)
+                                // Note: ToolResult event will be emitted after tool execution completes
                             },
                             toolCallsToExecute
                         )
@@ -149,6 +155,9 @@ class GeminiClient(
                     val functionCall = triple.first
                     val toolResult = triple.second
                     val callId = triple.third
+                    
+                    // Emit ToolResult event for UI
+                    emit(GeminiStreamEvent.ToolResult(functionCall.name, toolResult))
                     
                     // Format response based on tool result
                     val responseContent = when {
