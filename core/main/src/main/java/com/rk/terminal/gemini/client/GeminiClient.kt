@@ -139,37 +139,32 @@ class GeminiClient(
                 return@flow
             }
             
-            // Execute any pending tool calls in parallel
+            // Execute any pending tool calls
             if (toolCallsToExecute.isNotEmpty()) {
-                android.util.Log.d("GeminiClient", "sendMessageStream: Executing ${toolCallsToExecute.size} tool call(s) in parallel")
+                android.util.Log.d("GeminiClient", "sendMessageStream: Processing ${toolCallsToExecute.size} tool call result(s)")
                 
-                // Execute all tool calls in parallel using coroutines
-                val toolResponses = kotlinx.coroutines.coroutineScope {
-                    toolCallsToExecute.map { (functionCall, toolResult, callId) ->
-                        kotlinx.coroutines.async {
-                            // Format response based on tool result
-                            val responseContent = when {
-                                toolResult.error != null -> {
-                                    // Error response
-                                    mapOf("error" to (toolResult.error.message ?: "Unknown error"))
-                                }
-                                toolResult.llmContent is String -> {
-                                    // Simple string output
-                                    mapOf("output" to toolResult.llmContent)
-                                }
-                                else -> {
-                                    // Default success message
-                                    mapOf("output" to "Tool execution succeeded.")
-                                }
-                            }
-                            
-                            Triple(functionCall, responseContent, callId)
+                // Format responses and add to history
+                // Tools are already executed during response processing, we just format the results
+                for (triple in toolCallsToExecute) {
+                    val functionCall = triple.first
+                    val toolResult = triple.second
+                    val callId = triple.third
+                    
+                    // Format response based on tool result
+                    val responseContent = when {
+                        toolResult.error != null -> {
+                            // Error response
+                            mapOf("error" to (toolResult.error.message ?: "Unknown error"))
                         }
-                    }.map { it.await() }
-                }
-                
-                // Add all function responses to history
-                for ((functionCall, responseContent, callId) in toolResponses) {
+                        toolResult.llmContent is String -> {
+                            // Simple string output
+                            mapOf("output" to toolResult.llmContent)
+                        }
+                        else -> {
+                            // Default success message
+                            mapOf("output" to "Tool execution succeeded.")
+                        }
+                    }
                     chatHistory.add(
                         Content(
                             role = "user",
