@@ -1244,6 +1244,11 @@ class GeminiClient(
             updateTodos(todosWithProgress)
         }
         
+        // Helper function to wrap emit as suspend function
+        suspend fun emitEvent(event: GeminiStreamEvent) {
+            emit(event)
+        }
+        
         val fileListPrompt = """
             $systemContext
             
@@ -1287,7 +1292,7 @@ class GeminiClient(
         }
         
         var fileListResult = makeApiCallWithRetryAndCorrection(
-            model, fileListRequest, "file list", signal, null, { event -> emit(event) }, onChunk
+            model, fileListRequest, "file list", signal, null, ::emitEvent, onChunk
         )
         
         if (fileListResult == null) {
@@ -1398,7 +1403,7 @@ class GeminiClient(
         }
         
         var metadataText = makeApiCallWithRetryAndCorrection(
-            model, metadataRequest, "metadata", signal, null, { event -> emit(event) }, onChunk
+            model, metadataRequest, "metadata", signal, null, ::emitEvent, onChunk
         )
         
         if (metadataText == null) {
@@ -1549,7 +1554,7 @@ class GeminiClient(
             }
             
             val codeContent = makeApiCallWithRetryAndCorrection(
-                model, codeRequest, "code for $filePath", signal, null, { event -> emit(event) }, onChunk
+                model, codeRequest, "code for $filePath", signal, null, ::emitEvent, onChunk
             )
             
             if (codeContent == null) {
@@ -1629,7 +1634,7 @@ class GeminiClient(
         operationName: String,
         signal: CancellationSignal?,
         updateOutput: ((String) -> Unit)?,
-        emit: (GeminiStreamEvent) -> Unit,
+        emit: suspend (GeminiStreamEvent) -> Unit,
         onChunk: (String) -> Unit
     ): String? {
         var retryCount = 0
@@ -1822,7 +1827,12 @@ class GeminiClient(
         emit(GeminiStreamEvent.Chunk("📊 Phase 1: Extracting project structure...\n"))
         onChunk("📊 Phase 1: Extracting project structure...\n")
         
-        val projectStructure = extractProjectStructure(workspaceRoot, signal, { event -> emit(event) }, onChunk)
+        // Helper function to wrap emit as suspend function
+        suspend fun emitEvent(event: GeminiStreamEvent) {
+            emit(event)
+        }
+        
+        val projectStructure = extractProjectStructure(workspaceRoot, signal, ::emitEvent, onChunk)
         
         if (projectStructure.isEmpty()) {
             emit(GeminiStreamEvent.Error("No source files found in project"))
@@ -1903,7 +1913,7 @@ class GeminiClient(
         }
         
         var analysisText = makeApiCallWithRetryAndCorrection(
-            model, analysisRequest, "analysis", signal, null, { event -> emit(event) }, onChunk
+            model, analysisRequest, "analysis", signal, null, ::emitEvent, onChunk
         )
         
         if (analysisText == null) {
@@ -2079,7 +2089,7 @@ class GeminiClient(
         }
         
         var fixText = makeApiCallWithRetryAndCorrection(
-            model, fixRequest, "fixes", signal, null, { event -> emit(event) }, onChunk
+            model, fixRequest, "fixes", signal, null, ::emitEvent, onChunk
         )
         
         if (fixText == null) {
@@ -2216,7 +2226,7 @@ class GeminiClient(
     private suspend fun extractProjectStructure(
         workspaceRoot: String,
         signal: CancellationSignal?,
-        emit: (GeminiStreamEvent) -> Unit,
+        emit: suspend (GeminiStreamEvent) -> Unit,
         onChunk: (String) -> Unit
     ): String {
         val structure = StringBuilder()
