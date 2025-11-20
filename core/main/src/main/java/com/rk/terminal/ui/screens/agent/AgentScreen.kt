@@ -1871,4 +1871,5 @@ fun AgentScreen(
             aiClient = aiClient
         )
     }
+    }
 }
