@@ -11,6 +11,10 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -231,6 +235,10 @@ fun AgentScreen(
     var showWorkspacePicker by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
     var showDebugDialog by remember { mutableStateOf(false) }
+    var isPaused by remember(sessionId) { mutableStateOf(false) }
+    var showSessionMenu by remember { mutableStateOf(false) }
+    var showTerminateDialog by remember { mutableStateOf(false) }
+    var showNewSessionDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
@@ -334,12 +342,31 @@ fun AgentScreen(
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (useOllama) "Ollama AI Agent" else "Gemini AI Agent",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = if (useOllama) "Ollama AI Agent" else "Gemini AI Agent",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        if (isPaused) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.errorContainer,
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = "PAUSED",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = workspaceRoot,
                         style = MaterialTheme.typography.bodySmall,
@@ -349,6 +376,79 @@ fun AgentScreen(
                 }
                 IconButton(onClick = { showWorkspacePicker = true }) {
                     Icon(Icons.Default.Add, contentDescription = "Change Workspace", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+                // Pause/Resume button
+                IconButton(
+                    onClick = { 
+                        isPaused = !isPaused
+                        if (isPaused) {
+                            android.util.Log.d("AgentScreen", "Session $sessionId paused")
+                        } else {
+                            android.util.Log.d("AgentScreen", "Session $sessionId resumed")
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                        contentDescription = if (isPaused) "Resume" else "Pause",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                // Session menu button with dropdown
+                Box {
+                    IconButton(
+                        onClick = { showSessionMenu = true }
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = "Session Menu",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showSessionMenu,
+                        onDismissRequest = { showSessionMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Create New Session") },
+                            onClick = {
+                                showSessionMenu = false
+                                showNewSessionDialog = true
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.AddCircle, contentDescription = null)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(if (isPaused) "Resume Session" else "Pause Session") },
+                            onClick = {
+                                isPaused = !isPaused
+                                showSessionMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    if (isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+                        Divider()
+                        DropdownMenuItem(
+                            text = { Text("Terminate Session", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showSessionMenu = false
+                                showTerminateDialog = true
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Outlined.Stop,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        )
+                    }
                 }
                 IconButton(onClick = { showHistory = true }) {
                     Icon(Icons.Default.Edit, contentDescription = "History", tint = MaterialTheme.colorScheme.onPrimaryContainer)
@@ -563,7 +663,7 @@ fun AgentScreen(
                                     }
                                 }
                             },
-                            enabled = inputText.isNotBlank()
+                            enabled = inputText.isNotBlank() && !isPaused
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Send,
@@ -690,6 +790,229 @@ fun AgentScreen(
                 }
             }
         )
+    }
+    
+    // Session Menu - using Box with DropdownMenu positioned relative to button
+    Box {
+        // Invisible anchor for dropdown menu
+        if (showSessionMenu) {
+            DropdownMenu(
+                expanded = showSessionMenu,
+                onDismissRequest = { showSessionMenu = false }
+            ) {
+            DropdownMenuItem(
+                text = { Text("Create New Session") },
+                onClick = {
+                    showSessionMenu = false
+                    showNewSessionDialog = true
+                },
+                leadingIcon = {
+                    Icon(Icons.Outlined.AddCircle, contentDescription = null)
+                }
+            )
+            DropdownMenuItem(
+                text = { Text(if (isPaused) "Resume Session" else "Pause Session") },
+                onClick = {
+                    isPaused = !isPaused
+                    showSessionMenu = false
+                },
+                leadingIcon = {
+                    Icon(
+                        if (isPaused) Icons.Outlined.PlayArrow else Icons.Outlined.Pause,
+                        contentDescription = null
+                    )
+                }
+            )
+            Divider()
+            DropdownMenuItem(
+                text = { Text("Terminate Session", color = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    showSessionMenu = false
+                    showTerminateDialog = true
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.Stop,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            )
+        }
+    }
+    
+    // New Session Dialog
+    if (showNewSessionDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewSessionDialog = false },
+            title = { Text("Create New Session") },
+            text = {
+                Column {
+                    Text(
+                        "Start a new agent session? This will clear the current conversation and start fresh.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (messages.isNotEmpty()) {
+                        Text(
+                            "⚠️ Current session has ${messages.size} message(s) that will be cleared.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Text(
+                        "Current session: $sessionId",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNewSessionDialog = false
+                        // Create new session by clearing current state
+                        scope.launch {
+                            // Save current session history before clearing (optional - user might want to keep it)
+                            // For now, we'll clear it to start fresh
+                            
+                            // Clear history from persistence
+                            HistoryPersistenceService.deleteHistory(sessionId)
+                            
+                            // Clear current session state
+                            messages = emptyList()
+                            messageHistory = emptyList()
+                            inputText = ""
+                            isPaused = false
+                            currentResponseText = ""
+                            
+                            // Clear client history
+                            if (aiClient is GeminiClient) {
+                                aiClient.resetChat()
+                            }
+                            
+                            android.util.Log.d("AgentScreen", "New session created - cleared session $sessionId")
+                        }
+                    }
+                ) {
+                    Text("Create New")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewSessionDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Terminate Session Dialog
+    if (showTerminateDialog) {
+        AlertDialog(
+            onDismissRequest = { showTerminateDialog = false },
+            title = { 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Stop,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Terminate Session")
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "Are you sure you want to terminate this session?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "This will:",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text("• Clear all chat history for this session", style = MaterialTheme.typography.bodySmall)
+                    Text("• Reset the conversation", style = MaterialTheme.typography.bodySmall)
+                    Text("• Clear client chat history", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Session: $sessionId",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Terminate session: clear history and reset
+                        scope.launch {
+                            // Clear history from persistence
+                            HistoryPersistenceService.deleteHistory(sessionId)
+                            android.util.Log.d("AgentScreen", "Terminated session $sessionId - history cleared")
+                            
+                            // Clear messages
+                            messages = emptyList()
+                            messageHistory = emptyList()
+                            
+                            // Clear client history
+                            if (aiClient is GeminiClient) {
+                                aiClient.resetChat()
+                            }
+                            
+                            // Reset pause state
+                            isPaused = false
+                            
+                            showTerminateDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Terminate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTerminateDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Paused indicator
+    if (isPaused) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Pause,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    "Session Paused - Click resume to continue",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
     
     // Keys Exhausted Dialog with Wait and Retry
